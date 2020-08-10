@@ -2730,7 +2730,7 @@ class TextButtonSprite(ButtonSpriteBase):
         self.font = self.fontResources.simheif28
         self.text_image, text_rect = self.font.render(text, THECOLORS['white'])
         self.image = self.orig_image.copy()
-        self.image.blit(self.text_image, [(80 - text_rect.width) / 2, (40 - text_rect.height) / 2])
+        self.image.blit(self.text_image, [(80 - text_rect.width) // 2, (40 - text_rect.height) // 2])
         self.visible = False # 吃碰立直等按钮 一开始是不可见的
     def onClick(self):
         super().onClick()
@@ -2745,7 +2745,7 @@ class KanButtonSprite(TextButtonSprite):
     def updateTile(self, tilecode):
         self.text_image2, text_rect2 = self.tile_font.render('    ' + utils.tilecodeToUnicodeString(tilecode), THECOLORS['white'])
         self.image = self.image_with_kan.copy()
-        self.image.blit(self.text_image2, [(80 - text_rect2.width) / 2, (40 - text_rect2.height) / 2 + 1])
+        self.image.blit(self.text_image2, [(80 - text_rect2.width) // 2, (40 - text_rect2.height) // 2 + 1])
 
 class ControlButtonSprite(ButtonSpriteBase):
     # 自动和 鸣无等按钮
@@ -2883,12 +2883,12 @@ class SwitchButtonSprite(ButtonSpriteBase):
         self.font = self.fontResources.simheif28
         self.text_image, text_rect = self.font.render(texts[self.choice], THECOLORS['white'])
         self.image = self.orig_image.copy()
-        self.image.blit(self.text_image, [(80 - text_rect.width) / 2, (40 - text_rect.height) / 2])
+        self.image.blit(self.text_image, [(80 - text_rect.width) // 2, (40 - text_rect.height) // 2])
     def choose(self, choice):
         self.choice = choice
         self.text_image, text_rect = self.font.render(self.texts[self.choice], THECOLORS['white'])
         self.image = self.orig_image.copy()
-        self.image.blit(self.text_image, [(80 - text_rect.width) / 2, (40 - text_rect.height) / 2])
+        self.image.blit(self.text_image, [(80 - text_rect.width) // 2, (40 - text_rect.height) // 2])
     def next_choice(self):
         self.choose((self.choice + 1) % self.num_choices)
     def onClick(self):
