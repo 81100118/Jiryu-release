@@ -1,0 +1,11 @@
+*.mjlog
+*.txt
+1s.gif
+*.psd
+__pycache__
+.vscode
+202005
+cure_log
+data
+img_old
+[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]*
