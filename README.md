@@ -19,7 +19,7 @@
 以Ubuntu 20.04为例
 
 1. 安装python3：ubuntu 20.04自带python3，不用安装
-2. 安装pip：`sudo apt-get install pip3`
+2. 安装pip：`sudo apt-get install python3-pip`
 3. 安装依赖库：`sudo apt-get install python3-pygame`   `pip3 install websocket-client`
 4. 使用git克隆此仓库
 
@@ -48,7 +48,7 @@
 
 **牌山由天凤服务器生成，此客户端无法出千、无法透视，也无法改变任何人的运气。**
 
-**使用此客户端即表示接受所有风险，包括但不限于被封号、被封IP、数据（如ID、牌谱）丢失、数据泄露、掉线无法重连、掉段等。**
+**使用此客户端即视为接受所有风险，包括但不限于被封号、被封IP、数据（如ID、牌谱）丢失、数据泄露、掉线无法重连、掉段等。**
 
 
 
