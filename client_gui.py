@@ -313,7 +313,7 @@ class ClientGUI:
         self.busy = 0
         self.state = 0 # 0: unauthenticated 1: authenticated, idle 2: joining 3: playing
         self.waitingForReady = 0 # 0: 没弹窗，没在等 1: 弹出了窗 自己还没nextready 2: 自己已经nextready了
-        self.nextFunction = None # 等用户右键确认以后执行的函数
+        self.nextFunction = [] # 等用户右键确认以后执行的函数，是一个队列，头出(不一定尾进)
         self.actionTimestamp = 0.0
         self.rtt = 0
 
@@ -322,6 +322,12 @@ class ClientGUI:
         self.remainingTime = 0
         self.remainingOvertime = 0
         self.enableOvertime = False
+    def addNextFunction(self, func):
+        self.nextFunction.append(func)
+    def callNextFunction(self):
+        if self.nextFunction != []:
+            self.nextFunction[0]()
+            self.nextFunction.pop(0)
     def countdown(self):
         if self.remainingTime == -1:
             logger.warning('Timer is running while it should have been disabled')
@@ -496,7 +502,7 @@ class ClientGUI:
         self.popUpWindow = s
         logger.info('pop up window set to nintei info')
         
-        self.nextFunction = self.dismissWindow
+        self.addNextFunction(self.dismissWindow)
 
     def displayGameStartInfo(self):
         # 显示开局窗口
@@ -681,7 +687,7 @@ class ClientGUI:
         self.popUpWindow = s
         self.gameInfo = None
         logger.info('pop up window set to game end info')
-        self.nextFunction = self.autoLogin
+        self.addNextFunction(self.autoLogin)
 
     def displayKyokuInfo(self, action = False):
         # action似乎没用。。
@@ -2158,7 +2164,7 @@ class ClientGUI:
         self.storeGpid('')
         self.client.disconnect()
         self.state = 0
-        self.nextFunction = self.displayGameEndInfo
+        self.addNextFunction(self.displayGameEndInfo)
         
         log = self.gameInfo.log
         if not log:
@@ -2404,12 +2410,13 @@ class ClientGUI:
                     self.ruleSelectionButtonSpriteGroup.onMouseDown(event.button, event.pos)
             elif event.button == 3:
                 # 右键
+                # 因为一炮多响时可能已经终局，所以不能放在self.state == 3条件下，而是单独拿出来
+                if self.gameInfo and len(self.gameInfo.kyokuInfo.agariInfo) >= 2:
+                    self.gameInfo.kyokuInfo.agariInfo.pop(0)
+                    return
                 if self.state == 3:
                     # 正在牌桌上
-                    if len(self.gameInfo.kyokuInfo.agariInfo) == 2:
-                        self.gameInfo.kyokuInfo.agariInfo.pop(0)
-                        return
-                    elif self.waitingForReady == 1:
+                    if self.waitingForReady == 1:
                         self.ready()
                         self.waitingForReady = 2
                     elif self.gameInfo.gameControlInfo.canDiscard:
@@ -2420,11 +2427,7 @@ class ClientGUI:
                         self.discard(self.myHandTileSpriteGroup.sprites[-1].tilecode)
                     elif self.gameInfo.gameControlInfo.suggestion & 7 and not self.gameInfo.gameControlInfo.suggestion & 8:
                         self.passTile()
-                if self.nextFunction:
-                    tempFunction = self.nextFunction
-                    self.nextFunction = None
-                    tempFunction()
-                    logger.debug('next function called')
+                self.callNextFunction()
         elif event.type == pygame.MOUSEBUTTONUP:
             if event.button == 1:
                 if self.state == 3:
