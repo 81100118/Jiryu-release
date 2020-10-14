@@ -57,6 +57,7 @@ class KyokuInfo:
         self.agariInfo = [] # 有可能多家和了 所以是个空列表
         self.ryukyokuInfo = None
         self.owariInfo = None
+        self.discardTimestamp = 0.0 # 上一次切牌的时间戳 用来计算摸牌和切牌的时间差 从而判断是否有短卡顿
     def init_sanma(self):
         # 如果是三麻，要先调用这个函数
         self.sanma = True
@@ -258,7 +259,6 @@ class ClientGUI:
     def __init__(self):
         self.screen = pygame.display.set_mode([1024,768])
         pygame.display.set_caption('地龍')
-        pygame.mixer.init()
         
         self.imageResources = ImageResources.getInstance()
         self.bg = self.imageResources.bg
@@ -1762,6 +1762,13 @@ class ClientGUI:
             if settings.FORCE_DELAY:
                 self.busy = 10
             info = self.gameInfo.kyokuInfo
+            threshold_min = 0.1
+            threshold_max = 0.6
+            if message['_timestamp'] - info.discardTimestamp >= threshold_min and message['_timestamp'] - info.discardTimestamp <= threshold_max:
+                # 短卡顿
+                sp = GameMsgSprite('短卡顿！')
+                self.gamemsg_group.add(sp)
+            info.discardTimestamp = 0.0 # 重置
             who = ord(tag[0]) - ord('T')
             if len(tag) == 1:
                 hai = -1
@@ -1837,6 +1844,7 @@ class ClientGUI:
 
             hai = int(tag[1:])
             info = self.gameInfo.kyokuInfo
+            info.discardTimestamp = message['_timestamp']
             if who == 0 and info.playerState == 1:
                 # 如果自己切牌无论手模切都会收到大写D 因此要客户端自己判断手模切
                 if hai == info.hands[0][-1]:
@@ -1873,6 +1881,8 @@ class ClientGUI:
                 info.numNotPassedTiles[who], info.numNotPassedSujis[who] = info.calc_not_passed_tiles_and_sujis(who)
             if 't' in message:
                 # 如果有按钮出现
+                info.discardTimestamp = 0.0 # 自己造成的卡顿 不提示
+
                 suggestion = int(message['t'])
                 no_suggestion = 0
                 if self.controlButtonSpriteGroup.getSpriteById('no_naki').selected:
@@ -1928,6 +1938,7 @@ class ClientGUI:
             # 更新kyokuInfo里的副露信息
             # 实战无法根据数据包判断对手的手摸拔/杠
             info = self.gameInfo.kyokuInfo
+            info.discardTimestamp = 0.0 # 切的牌被副露了 重置切牌时间戳
             info.whosTurn = who
             if furo.isKan == 2: # 加杠
                 info.playerState = 4 # 状态为加杠尚未通过
@@ -2074,6 +2085,7 @@ class ClientGUI:
                 self.displayCall(who, 'ron')
                 self.soundResources.sound['ron'].play()
                 print('Player', fromWho, self.gameInfo.tableInfo.getPlayerByIndex(fromWho)['name'], '放铳')
+                self.gameInfo.kyokuInfo.playerState = 0
             if 'paoWho' in message:
                 paoWho = int(message['paoWho'])
                 print('Player', paoWho, self.gameInfo.tableInfo.getPlayerByIndex(paoWho)['name'], '包牌')
@@ -2086,7 +2098,6 @@ class ClientGUI:
             self.gameInfo.gameControlInfo.suggestion = 0
             self.gameInfo.gameControlInfo.suggestedTile = -1
             self.textButtonSpriteGroup.setInvisible()
-            self.gameInfo.kyokuInfo.playerState = 0
 
             if who != 0:
                 hand = list(map(int, message['hai'].split(',')))
@@ -3155,6 +3166,8 @@ class DownloadHaifuThread(threading.Thread):
 
 if __name__ == "__main__":
     setupLogging()
+    pygame.mixer.pre_init(44100, -16, 2, 2048)
+    pygame.mixer.init()
     pygame.init()
     pygame.freetype.init()
     clientGUI = ClientGUI()
