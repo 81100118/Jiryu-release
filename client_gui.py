@@ -1859,6 +1859,7 @@ class ClientGUI:
                 self.myHandTileSpriteGroup.removeTile(hai)
                 self.myHandTileSpriteGroup.sort()
                 # 在接收到服务器的自己出牌的信息后，再把手牌变红 不然还没出去就变红看起来有点难受。。
+                self.gameInfo.gameControlInfo.canDiscard = False
                 self.myHandTileSpriteGroup.setCanDiscard(False)
                 info.hands[who].remove(hai)
                 self.updateMachi()
@@ -1901,6 +1902,8 @@ class ClientGUI:
                     self.soundResources.sound['button'].play()
                     self.textButtonSpriteGroup.getSpriteById('pass').visible = True
                     self.setTimer(const.TIME[1] if self.gameInfo.tableInfo.isFast() else const.TIME[0])
+                    # 把手牌变绿，不然选副露牌的时候手牌是红的有点难受
+                    self.myHandTileSpriteGroup.setCanDiscard(True)
 
                     self.gameInfo.gameControlInfo.suggestion = suggestion
                     self.gameInfo.gameControlInfo.suggestedTile = hai
@@ -2181,7 +2184,7 @@ class ClientGUI:
         if not log:
             log = self.readTempLog()
         if log:
-            downloadHaifuThread = DownloadHaifuThread(self.gameInfo.log, (4 - self.gameInfo.initialOya) % 4)
+            downloadHaifuThread = DownloadHaifuThread(log, (4 - self.gameInfo.initialOya) % 4)
             self.gameInfo.log = ''
             self.storeTempLog('')
             timer = threading.Timer(15, downloadHaifuThread.run)
@@ -2244,36 +2247,36 @@ class ClientGUI:
         self.client.daiminkan()
     def ankan(self, tilecode):
         self.stopTimer()
-        self.canDiscard = False
+        self.gameInfo.gameControlInfo.canDiscard = False
         self.actionTimestamp = time.time()
         self.client.ankan(tilecode)
     def kakan(self, tilecode):
         self.stopTimer()
-        self.canDiscard = False
+        self.gameInfo.gameControlInfo.canDiscard = False
         self.actionTimestamp = time.time()
         self.client.kakan(tilecode)
     def kita(self):
         self.stopTimer()
-        self.canDiscard = False
+        self.gameInfo.gameControlInfo.canDiscard = False
         self.actionTimestamp = time.time()
         self.client.kita()
     def ron(self):
         self.stopTimer()
-        self.canDiscard = False
+        self.gameInfo.gameControlInfo.canDiscard = False
         self.client.ron()
     def tsumo(self):
         self.stopTimer()
-        self.canDiscard = False
+        self.gameInfo.gameControlInfo.canDiscard = False
         self.actionTimestamp = time.time()
         self.client.tsumo()
     def ninenine(self):
         self.stopTimer()
-        self.canDiscard = False
+        self.gameInfo.gameControlInfo.canDiscard = False
         self.actionTimestamp = time.time()
         self.client.ninenine()
     def reach(self):
         self.stopTimer()
-        self.canDiscard = False
+        self.gameInfo.gameControlInfo.canDiscard = False
         self.actionTimestamp = time.time()
         self.client.reach()
     def passTile(self):

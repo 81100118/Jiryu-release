@@ -6,7 +6,17 @@ from analyzer import TableInfo
 
 def get_monthly_rankings(criterion, rulecode):
     # criterion: aag, ahj, ...
-    resp = requests.get('http://tenhou.net/sc/' + criterion + '-' + str(rulecode) + '.js')
+    success = False
+    retry_count = 3
+    while not success:
+        try:
+            resp = requests.get('http://tenhou.net/sc/' + criterion + '-' + str(rulecode) + '.js', timeout=5)
+            success = True
+        except:
+            if retry_count == 0:
+                return
+            retry_count -= 1
+        
     '''
     with open('data/ahj-57.js', 'wb') as f:
         f.write(resp.content)
@@ -26,14 +36,24 @@ def get_monthly_rankings(criterion, rulecode):
             # print(tr)
             
     for i in range(len(tr) // 2):
-        if tr[2 * i] == '二階堂美樹':
-            print('月间', tr[2 * i + 1].split(',')[0], i + 1, '/', len(tr) // 2, '位')
+        if tr[2 * i] in ['二階堂美樹', '小可愛', '81100118', '天才麻将杏杏', '理論力学', '>_0@杏杏軍團']:
+            print(tr[2 * i], '月间', tr[2 * i + 1].split(',')[0], i + 1, '/', len(tr) // 2, '位')
 
 def get_wg_info(rulecode):
     temp_table_info = TableInfo()
     temp_table_info.rule = rulecode
     print(temp_table_info.getRuleString2())
-    resp = requests.get('https://mjv.jp/0/wg/0000.js')
+
+    success = False
+    retry_count = 3
+    while not success:
+        try:
+            resp = requests.get('https://mjv.jp/0/wg/0000.js', timeout=5)
+            success = True
+        except:
+            if retry_count == 0:
+                return
+            retry_count -= 1
     text = resp.text[3:-2]
     j = json.loads(text)
     player_data = {}
@@ -61,5 +81,7 @@ def get_wg_info(rulecode):
 
 get_monthly_rankings('aag', 57)
 get_monthly_rankings('ahj', 57)
+get_monthly_rankings('aag', 185)
+get_monthly_rankings('ahj', 185)
 get_wg_info(57)
 get_wg_info(185)

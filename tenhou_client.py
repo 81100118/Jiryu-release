@@ -5,6 +5,7 @@ import utils
 import threading
 import random
 import time
+import settings
 
 authenticated = False
 client = None
@@ -102,21 +103,35 @@ def send(ws, msg):
     except:
         print('SEND ERROR:')
         print(msg)
+        if settings.AUTO_DISCONNECT_WHEN_SEND_ERROR:
+            print('Auto disconnect when send error')
+            ws.close()
+        # TODO: 在gui上显示错误信息提醒用户拔线
 
 class HeartbeatLoopThread(threading.Thread):
     def __init__(self, ws):
         super().__init__()
         self.ws = ws
+        self.timer = None
+        self.skip = True
     def run(self):
         #counter = 0
         #print('----------------------------------------')
         #print(self.ws.sock.connected)
         if self.ws.sock and self.ws.sock.connected:
-            send(self.ws, '<Z/>')
-            if PXR != 0:
-                send(self.ws, '<PXR v="' + str(PXR) + '" />')
-            timer = threading.Timer(10, self.run)
-            timer.start()
+            if self.skip:
+                self.skip = False
+            else:
+                send(self.ws, '<Z/>')
+                if PXR != 0:
+                    send(self.ws, '<PXR v="' + str(PXR) + '" />')
+            self.timer = threading.Timer(10, self.run)
+            self.timer.start()
+    def join(self):
+        if self.timer != None:
+            self.timer.cancel()
+        super().join()
+
         '''
         while(authenticated):
             counter += 1
@@ -195,7 +210,7 @@ class TenhouClient:
         send(self.ws, '<BYE/>')
         authenticated = False
         self.heartbeatLoopThread.join()
-        time.sleep(1)
+        # time.sleep(1)
     def gotoLobby(self, lobby):
         # int -> None
         # 等待，直到收到成功进入lobby的消息 # 不等待 谁调用谁等
@@ -257,6 +272,7 @@ class TenhouClient:
     def disconnect(self):
         global voluntarily_close
         voluntarily_close = True
+        self.heartbeatLoopThread.join()
         self.ws.close()
     def registerProcessFunc(self, function):
         self.processFunc = function
