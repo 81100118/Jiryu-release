@@ -110,6 +110,7 @@ class GameControlInfo:
         self.kanSuggestions = [] # 自己摸完牌之后，可以怎么杠 [[杠种类，tilecode]] 杠种类：暗杠为4 加杠为5 tilecode：暗杠为tilecode>>2<<2 加杠为那张加杠牌本身
         self.selectedTiles = []
         self.displayScoreDiff = False # 桌子中间显示分差还是绝对分数
+        self.highlightTile = -1 # 高亮显示的那张牌
         
 class GameInfo:
     def __init__(self):
@@ -193,6 +194,10 @@ class ImageResources:
         self.black_surfs = []
         for i in range(4):
             self.black_surfs.append(makeTransparentSurf(self.img_tiles[i % 2], \
+                [self.TILE_WIDTHS[i] * 8, self.TILE_HEIGHTS[i] * 3, self.TILE_WIDTHS[i], self.TILE_HEIGHTS[i]]))
+        self.green_surfs = []
+        for i in range(4):
+            self.green_surfs.append(makeTransparentSurf(self.img_tiles[i % 2 + 2], \
                 [self.TILE_WIDTHS[i] * 8, self.TILE_HEIGHTS[i] * 3, self.TILE_WIDTHS[i], self.TILE_HEIGHTS[i]]))
         self.mytile_green_surf = makeTransparentSurf(self.img_mytiles, \
             [self.TILE_WIDTH * 0, self.TILE_HEIGHT * 3, self.TILE_WIDTH, self.TILE_HEIGHT])
@@ -278,6 +283,7 @@ class ClientGUI:
         self.img_tileback3 = self.imageResources.img_tileback3
 
         self.black_surfs = self.imageResources.black_surfs
+        self.green_surfs = self.imageResources.green_surfs
 
 
         self.bg = pygame.transform.smoothscale(self.bg, [1024, 768]).convert()
@@ -294,11 +300,15 @@ class ClientGUI:
 
         self.soundResources = SoundResources.getInstance()
 
-        self.calltext_group = pygame.sprite.Group()
+        # self.calltext_group = pygame.sprite.Group()
+        self.calltext_group = None # 先不new，等需要的时候再new，下同
         self.gamemsg_group = pygame.sprite.Group()
-        self.myHandTileSpriteGroup = MyHandTileSpriteGroup()
-        self.textButtonSpriteGroup = TextButtonSpriteGroup()
-        self.controlButtonSpriteGroup = ControlButtonSpriteGroup()
+        # self.myHandTileSpriteGroup = MyHandTileSpriteGroup()
+        self.myHandTileSpriteGroup = None # 先不new，等需要的时候再new，下同
+        # self.textButtonSpriteGroup = TextButtonSpriteGroup()
+        self.textButtonSpriteGroup = None
+        # self.controlButtonSpriteGroup = ControlButtonSpriteGroup()
+        self.controlButtonSpriteGroup = None
         self.ruleSelectionButtonSpriteGroup = RuleSelectionButtonSpriteGroup()
         self.popUpWindow = None
 
@@ -358,6 +368,8 @@ class ClientGUI:
     def stopTimer(self):
         if self.timer:
             self.timer.cancel()
+        if self.autoActionTimer:
+            self.autoActionTimer.cancel()
     
     def displayCountdown(self):
         time_str = str(self.remainingTime)
@@ -443,7 +455,9 @@ class ClientGUI:
         self._blit_tile_helper(dest, self.img_tiles[direction], \
             [self.TILE_WIDTHS[direction] * num, self.TILE_HEIGHTS[direction] * suit, self.TILE_WIDTHS[direction], self.TILE_HEIGHTS[direction]], \
             pos)
-        if mask & 1:
+        if self.gameInfo and self.gameInfo.gameControlInfo and self.gameInfo.gameControlInfo.highlightTile != -1 and self.gameInfo.gameControlInfo.highlightTile == (tilecode >> 2):
+            self._blit_tile_helper(dest, self.green_surfs[direction], None, pos)
+        elif mask & 1:
             self._blit_tile_helper(dest, self.black_surfs[direction], None, pos)
 
     def blit_handtile(self, dest, direction, tilecode, pos, mask=0):
@@ -592,53 +606,74 @@ class ClientGUI:
                     temp_str += ' +' + str(sc_change * 100)
                 elif sc_change < 0:
                     temp_str += ' ' + str(sc_change * 100)
-                ClientGUI.blit_text(self.screen, temp_str, [300, 450 + tableDirection * 30], self.ten_font)
+                ClientGUI.blit_text(self.screen, temp_str, [300, 463 + tableDirection * 30], self.ten_font)
 
     def displayAgariInfo(self):
         attributes = self.gameInfo.kyokuInfo.agariInfo[0]
-        bg_disp_pos = [(1024 - 600) // 2, (740 - 450) // 2]
+        bg_disp_pos = [(1024 - 550) // 2, (750 - 450) // 2]
         # 显示和牌框背景
-        bg_surf = pygame.Surface((600, 450))  # the size of your rect
+        bg_surf = pygame.Surface((550, 450))  # the size of your rect
         bg_surf.set_alpha(192)                # alpha level
         bg_surf.fill((0, 0, 0))           # this fills the entire surface
         self.screen.blit(bg_surf, bg_disp_pos)
         
         yaku_string = ''
+        yaku_string2 = '' # 分两列显示时右边那列
         han = 0
+        yaku_disp_pos = [300, 190]
+        yaku_disp_pos2 = [550, 190]
+        score_disp_pos = [300, 370]
+        
         if 'yaku' in attributes:
             yakus = attributes['yaku'].split(',')
-            for i in range(len(yakus) // 2):
-                yaku_string += (utils.yakucodeToString(int(yakus[2 * i])))
-                yaku_string += (' ' + yakus[2 * i + 1] + '翻\n')
+            n_yakus = len(yakus) // 2
+            if n_yakus >= 6:
+                score_disp_pos[1] = yaku_disp_pos[1] + 29 * ((n_yakus + 1) // 2)
+            else:
+                score_disp_pos[1] = yaku_disp_pos[1] + 29 * n_yakus
+            for i in range(n_yakus):
+                line = (utils.yakucodeToString(int(yakus[2 * i])))
+                line += (' ' + yakus[2 * i + 1] + '翻\n')
+                if n_yakus >= 6 and i * 2 >= n_yakus:
+                    yaku_string2 += line
+                else:
+                    yaku_string += line
                 han += int(yakus[2 * i + 1])
         if 'yakuman' in attributes:
             yakus = attributes['yakuman'].split(',')
-            for i in range(len(yakus)):
+            n_yakus = len(yakus)
+            score_disp_pos[1] = yaku_disp_pos[1] + 29 * n_yakus
+            for i in range(n_yakus):
                 yaku_string += utils.yakucodeToString(int(yakus[i]))
                 yaku_string += '\n'
                 han += 13
         value = attributes['ten'].split(',')
         fu = int(value[0])
+        if fu == 0:
+            fu = 25
         score = int(value[1])
         limit = int(value[2])
 
-        yaku_string += (str(fu) + '符' + str(han) + '翻 ' + str(score) + '点 ' + ['', '满贯', '跳满', '倍满', '三倍满', '役满'][limit] + '\n')
+        score_string = (str(fu) + '符' + str(han) + '翻 ' + str(score) + '点 ' + ['', '满贯', '跳满', '倍满', '三倍满', '役满'][limit] + '\n')
 
         if 'doraHai' in attributes:
             doraIndicators = list(map(int, attributes['doraHai'].split(',')))
         else:
             doraIndicators = []
-        self.blitDoraIndicators(self.screen, doraIndicators, [270, 400])
+        self.blitDoraIndicators(self.screen, doraIndicators, [270, 390])
         if 'doraHaiUra' in attributes:
             doraIndicators = list(map(int, attributes['doraHaiUra'].split(',')))
         else:
             doraIndicators = []
-        self.blitDoraIndicators(self.screen, doraIndicators, [540, 400])
+        self.blitDoraIndicators(self.screen, doraIndicators, [540, 390])
         
 
-        text_disp_pos = [300, 200]
         # yaku_surf = self.yaku_font.render(yaku_string, True, THECOLORS['white'])
-        ClientGUI.blit_text(self.screen, yaku_string, text_disp_pos, self.yaku_font)
+        ClientGUI.blit_text(self.screen, yaku_string, yaku_disp_pos, self.yaku_font)
+        ClientGUI.blit_text(self.screen, yaku_string2, yaku_disp_pos2, self.yaku_font)
+        ClientGUI.blit_text(self.screen, score_string, score_disp_pos, self.yaku_font)
+
+
         self.displayScoreChange(attributes['sc'])
     def displayRyukyokuInfo(self):
         attributes = self.gameInfo.kyokuInfo.ryukyokuInfo
@@ -1565,6 +1600,7 @@ class ClientGUI:
         self.messageQueue.put(message)
     
     def on_close(self):
+        self.stopTimer()
         sp = GameMsgSprite('您已掉线，请按鼠标中键重连')
         self.gamemsg_group.add(sp)
 
@@ -1623,6 +1659,11 @@ class ClientGUI:
             self.pxr(0)
             self.client.gok()
             self.state = 3
+
+            self.calltext_group = pygame.sprite.Group()
+            self.myHandTileSpriteGroup = MyHandTileSpriteGroup()
+            self.textButtonSpriteGroup = TextButtonSpriteGroup()
+            self.controlButtonSpriteGroup = ControlButtonSpriteGroup()
             if self.gameInfo.tableInfo.isSanma():
                 self.controlButtonSpriteGroup.getSpriteById('no_chi').visible = False
                 self.controlButtonSpriteGroup.getSpriteById('no_pon').visible = False
@@ -1631,7 +1672,6 @@ class ClientGUI:
                 self.controlButtonSpriteGroup.getSpriteById('no_pon').visible = True
             self.ruleSelectionButtonSpriteGroup.getSpriteById('join').choose(0)
             self.ruleSelectionButtonSpriteGroup.setEnabled(True)
-            self.myHandTileSpriteGroup = MyHandTileSpriteGroup()
         elif tag == 'UN':
             # 可能是开局玩家信息，也可能是有人重连了
             # 目前根据有没有'dan'属性来判断是开局还是重连
@@ -1756,18 +1796,20 @@ class ClientGUI:
             self.popUpWindow = None
         elif tag == 'SAIKAI':
             self.displayGameResumeInfo(message)
-        elif tag[0] in 'TUVW' and (len(tag) == 1 or tag[1] in '0123456789'):
+        elif tag[0] in 'TUVW' and (len(tag) == 1 or tag[1] in '0123456789') and self.state == 3:
             # 摸牌
             # self.soundResources.sound['draw'].play()
             if settings.FORCE_DELAY:
                 self.busy = 10
             info = self.gameInfo.kyokuInfo
-            threshold_min = 0.1
-            threshold_max = 0.6
+            threshold_min = settings.SHORT_LAG_THRESHOLD_MIN
+            threshold_max = settings.SHORT_LAG_THRESHOLD_MAX
             if message['_timestamp'] - info.discardTimestamp >= threshold_min and message['_timestamp'] - info.discardTimestamp <= threshold_max:
                 # 短卡顿
-                sp = GameMsgSprite('短卡顿！')
-                self.gamemsg_group.add(sp)
+                if settings.DISP_SHORT_LAG:
+                    sp = GameMsgSprite('短卡顿！')
+                    self.gamemsg_group.add(sp)
+                print('卡顿时长：', message['_timestamp'] - info.discardTimestamp)
             info.discardTimestamp = 0.0 # 重置
             who = ord(tag[0]) - ord('T')
             if len(tag) == 1:
@@ -1828,7 +1870,7 @@ class ClientGUI:
                     else:
                         self.discard(hai)
                 
-        elif (tag[0] in 'DEFG' or tag[0] in 'defg') and tag[1] in '0123456789':
+        elif (tag[0] in 'DEFG' or tag[0] in 'defg') and tag[1] in '0123456789' and self.state == 3:
             if settings.FORCE_DELAY:
                 self.busy = 10
             if tag[0] in 'DEFG':
@@ -1933,7 +1975,7 @@ class ClientGUI:
             # print('Player', who, self.gameInfo.tableInfo.getPlayerByIndex(who)['name'], ['手切', '摸切'][tsumogiri], utils.tilecodeToString2(hai))
             # print('手牌', list(map(utils.tilecodeToString2, info.hands[who])))
             # print('牌河', list(map(lambda tileAndInfo : (['', '摸切', '被副露', '摸切被副露'][tileAndInfo[1] % 4]) + ('立直' if tileAndInfo[1] & 4 else '') +  utils.tilecodeToString2(tileAndInfo[0]), (info.rivers[who]))))
-        elif tag == 'N':
+        elif tag == 'N' and self.state == 3:
             # 副露
             who = int(message['who'])
             m = int(message['m'])
@@ -2045,12 +2087,12 @@ class ClientGUI:
                     else:
                         logger.warning('Unreachable')
 
-        elif tag == 'DORA':
+        elif tag == 'DORA' and self.state == 3:
             hai = int(message['hai'])
             self.gameInfo.kyokuInfo.doraIndicators.append(hai)
             print('新dora指示牌', utils.tilecodeToString2(hai))
             self.gameInfo.kyokuInfo.reveal_tile(hai)
-        elif tag == 'REACH':
+        elif tag == 'REACH' and self.state == 3:
             who = int(message['who'])
             step = int(message['step'])
             info = self.gameInfo.kyokuInfo
@@ -2076,7 +2118,7 @@ class ClientGUI:
                 if who == 0:
                     # 自己立直成功了，把自己手牌disable
                     self.myHandTileSpriteGroup.setEnabled(False)
-        elif tag == 'AGARI':
+        elif tag == 'AGARI' and self.state == 3:
             who = int(message['who'])
             fromWho = int(message['fromWho'])
             print('Player', who, self.gameInfo.tableInfo.getPlayerByIndex(who)['name'], '和了')
@@ -2115,7 +2157,7 @@ class ClientGUI:
             else:
                 self.waitingForReady = 1
                 self.setTimer(10, False)
-        elif tag == 'RYUUKYOKU':
+        elif tag == 'RYUUKYOKU' and self.state == 3:
             print('流局')
             for key in message:
                 print("attributes: ", key, "=", message[key])
@@ -2133,12 +2175,12 @@ class ClientGUI:
             else:
                 self.waitingForReady = 1
                 self.setTimer(5, False)
-        elif tag == 'BYE':
+        elif tag == 'BYE' and self.state == 3:
             # 'who' 掉线了
             who = int(message['who'])
             self.gameInfo.online[who] = False
             print(self.gameInfo.tableInfo.players[who]['name'], '掉线了')
-        elif tag == 'FURITEN':
+        elif tag == 'FURITEN' and self.state == 3:
             if 'show' in message:
                 if message['show'] == '0':
                     self.gameInfo.kyokuInfo.furiten = False
@@ -2151,7 +2193,7 @@ class ClientGUI:
             # TODO
             pass
         else:
-            logger.error("Unexpected tag")
+            logger.warning("Unexpected tag")
 
     def _removeHandByFuro(self, hand, furo):
         # 根据副露信息来移除对手手牌
@@ -2396,30 +2438,41 @@ class ClientGUI:
             if event.button == 2:
                 if self.client.ws.sock and self.client.ws.sock.connected:
                     # self.client.logout()
-                    if settings.MIDDLE_CLICK_DISCONNECT:
-                        self.client.disconnect()
+                    if self.state != 3 or self.gameInfo.tableInfo.isPVP():
+                        # 如果打真人或不在打牌，中键为拔线
+                        if settings.MIDDLE_CLICK_DISCONNECT:
+                            self.client.disconnect(False)
+                    else:
+                        # 如果打电脑，中键为结束对局
+                        self.client.logout()
+                        self.stopTimer()
+                        self.state = 0
+                        self.gameInfo = None
+                        self.dismissWindow()
+                        self.login(settings.ID)
+                        self.gotoLobby(settings.LOBBY)
                 else:
                     sp = GameMsgSprite('重连中')
                     self.gamemsg_group.add(sp)
                     self.gameInfo = None
+                    self.dismissWindow()
                     success = self.client.init()
                     if not success:
                         #sp = GameMsgSprite('重连失败')
                         return
                     self.state = 0 # 0: unauthenticated 1: authenticated, idle 2: joining 3: playing
-                    gpid = ''
-                    if self.gameInfo:
-                        gpid = self.gameInfo.gpid
-                    if gpid == '':
-                        gpid = self.readGpid()
+                    gpid = self.readGpid()
                     success = self.client.login(settings.ID, 'F', gpid)
                     if not success:
                         return
             elif event.button == 1:
                 if self.state == 3:
-                    self.textButtonSpriteGroup.onMouseDown(event.button, event.pos)
-                    self.controlButtonSpriteGroup.onMouseDown(event.button, event.pos)
-                    self.myHandTileSpriteGroup.onMouseDown(event.button, event.pos)
+                    if self.textButtonSpriteGroup:
+                        self.textButtonSpriteGroup.onMouseDown(event.button, event.pos)
+                    if self.controlButtonSpriteGroup:
+                        self.controlButtonSpriteGroup.onMouseDown(event.button, event.pos)
+                    if self.myHandTileSpriteGroup:
+                        self.myHandTileSpriteGroup.onMouseDown(event.button, event.pos)
                 elif self.state == 1 or self.state == 2:
                     self.ruleSelectionButtonSpriteGroup.onMouseDown(event.button, event.pos)
             elif event.button == 3:
@@ -2610,11 +2663,20 @@ class ClientGUI:
             self.display()
             mouse_pos = pygame.mouse.get_pos()
             adjusted_mouse_pos = (mouse_pos[0], mouse_pos[1] - 2) # 坐标不准 所以要调整一下
-            self.controlButtonSpriteGroup.onMouseMotion(adjusted_mouse_pos)
-            sp = self.myHandTileSpriteGroup.onMouseMotion(adjusted_mouse_pos)
-            if sp and sp.enabled and sp.canDiscard and ((sp.tilecode >> 2) in self.gameInfo.kyokuInfo.discardToMachi):
-                if settings.DISP_MACHI:
-                    self.displayMachi(self.gameInfo.kyokuInfo.discardToMachi[sp.tilecode >> 2], sp.tilecode >> 2)
+            if self.controlButtonSpriteGroup:
+                self.controlButtonSpriteGroup.onMouseMotion(adjusted_mouse_pos)
+            if self.myHandTileSpriteGroup:
+                sp = self.myHandTileSpriteGroup.onMouseMotion(adjusted_mouse_pos)
+                if sp and sp.enabled and sp.canDiscard and ((sp.tilecode >> 2) in self.gameInfo.kyokuInfo.discardToMachi):
+                    if settings.DISP_MACHI:
+                        self.displayMachi(self.gameInfo.kyokuInfo.discardToMachi[sp.tilecode >> 2], sp.tilecode >> 2)
+                if self.gameInfo and self.gameInfo.gameControlInfo:
+                    if sp and sp.enabled and settings.DISP_HIGHLIGHT:
+                        self.gameInfo.gameControlInfo.highlightTile = sp.tilecode >> 2
+                    else:
+                        self.gameInfo.gameControlInfo.highlightTile = -1
+
+                
             if self.gameInfo:
                 rect = pygame.Rect((1024 - 6 * self.TILE_WIDTHS[0]) // 2, (740 - 6 * self.TILE_HEIGHT_EFF[1]) // 2, \
                     6 * self.TILE_WIDTHS[0], 6 * self.TILE_HEIGHT_EFF[1])

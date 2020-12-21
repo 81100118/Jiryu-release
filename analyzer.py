@@ -85,6 +85,9 @@ class TableInfo:
     def isFast(self):
         # 是否是速
         return ((self.rule & 0x40) > 0)
+    def isPVP(self):
+        # 是否是打真人
+        return ((self.rule & 0x01) > 0)
     def getLevel(self):
         # 般上特疯 0123
         if (self.rule & 0xa0) == 0xa0:

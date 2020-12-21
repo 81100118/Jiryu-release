@@ -183,7 +183,7 @@ class TenhouClient:
                 return False
         print('done')
         return True
-    def login(self, name, sx='M', gpid = None):
+    def login(self, name, sx='F', gpid = None):
         if authenticated:
             return
         msg_to_send = {'tag': 'HELO', 'name': name, 'sx': sx}
@@ -269,9 +269,9 @@ class TenhouClient:
     def passTile(self):
         # pass被python占用了。。只能换个名字
         send(self.ws, {'tag': 'N'})
-    def disconnect(self):
+    def disconnect(self, voluntary=True):
         global voluntarily_close
-        voluntarily_close = True
+        voluntarily_close = voluntary
         self.heartbeatLoopThread.join()
         self.ws.close()
     def registerProcessFunc(self, function):
